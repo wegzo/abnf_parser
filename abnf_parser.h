@@ -12,6 +12,7 @@
 
 class abnf_parser;
 typedef std::string::const_iterator str_const_iterator;
+typedef std::map<std::string, std::string> matched_patterns_t;
 
 // element encapsulates () and [] rules
 class abnf_element
@@ -28,7 +29,7 @@ public:
     abnf_element(abnf_parser&);
 
     virtual bool generate(str_const_iterator& it, const str_const_iterator& end);
-    virtual bool run(str_const_iterator& it, const str_const_iterator& end);
+    virtual bool run(str_const_iterator& it, const str_const_iterator& end, matched_patterns_t&) const;
 };
 
 class abnf_repetition : public abnf_element
@@ -44,7 +45,7 @@ public:
     abnf_repetition(abnf_parser&);
 
     bool generate(str_const_iterator& it, const str_const_iterator& end);
-    bool run(str_const_iterator& it, const str_const_iterator& end);
+    bool run(str_const_iterator& it, const str_const_iterator& end, matched_patterns_t&) const;
 };
 
 class abnf_concatenation : public abnf_element
@@ -56,7 +57,7 @@ public:
     abnf_concatenation(abnf_parser&);
 
     bool generate(str_const_iterator& it, const str_const_iterator& end);
-    bool run(str_const_iterator& it, const str_const_iterator& end);
+    bool run(str_const_iterator& it, const str_const_iterator& end, matched_patterns_t&) const;
 };
 
 class abnf_alternation : public abnf_element
@@ -68,15 +69,15 @@ public:
     abnf_alternation(abnf_parser&);
 
     bool generate(str_const_iterator& it, const str_const_iterator& end);
-    bool run(str_const_iterator& it, const str_const_iterator& end);
+    bool run(str_const_iterator& it, const str_const_iterator& end, matched_patterns_t&) const;
 };
 
-// TODO: decide if save all matched patterns
 // TODO: add function to alternation to add new element
 class abnf_rule
 {
 private:
     bool generated;
+    bool store_matched;
 
     abnf_parser& parser;
     // same as default element but without '(' and ')'
@@ -84,17 +85,16 @@ private:
     bool incremental; // false: '=', true: '=/'
     // TODO: defined-as tells how to run the elements
 public:
-    bool matched;
-    std::string rulename, matched_pattern;
+    std::string rulename;
 
-    abnf_rule(abnf_parser&);
+    abnf_rule(abnf_parser&, bool store_matched);
 
     // elements = alternation *c-wsp
     // parses "rulename defined-as elements c-nl"
     bool generate(str_const_iterator& it, const str_const_iterator& end);
     // runs the stored method using these arguments;
     // returns whether the match was successful
-    bool run(str_const_iterator& it, const str_const_iterator& end);
+    bool run(str_const_iterator& it, const str_const_iterator& end, matched_patterns_t&) const;
 };
 
 // rule names are case sensitive
@@ -104,15 +104,13 @@ class abnf_rulename : public abnf_element
 private:
     abnf_rule* rule;
 public:
-    std::string rulename;
-
     abnf_rulename(abnf_parser&);
 
-    // stores the rulename
-    bool generate_rulename(str_const_iterator& it, const str_const_iterator& end);
-    // stores the rulename and binds it to the rule object
+    // stores the rulename to arg
+    bool generate_rulename(str_const_iterator& it, const str_const_iterator& end, std::string&);
+    // binds this rulename to the rule object
     bool generate(str_const_iterator& it, const str_const_iterator& end);
-    bool run(str_const_iterator& it, const str_const_iterator& end);
+    bool run(str_const_iterator& it, const str_const_iterator& end, matched_patterns_t&) const;
 };
 
 class abnf_parser
@@ -126,15 +124,16 @@ public:
 
     // syntax = rulename defined-as elements (no need for crlf)
     // add rule automatically generates the rule
-    bool add_rule(std::string syntax);
+    bool add_rule(std::string syntax, bool store_matched = true);
     // NULL if rule not found
     abnf_rule* get_rule(const std::string& rulename);
+    const abnf_rule* get_rule(const std::string& rulename) const;
 
     // syntax is in a form of elements
     bool generate(const std::string& syntax);
     // runs the default entry object
-    bool run(const std::string& input);
-    bool run(str_const_iterator& it, const str_const_iterator& end);
+    bool run(const std::string& input, matched_patterns_t&) const;
+    bool run(str_const_iterator& it, const str_const_iterator& end, matched_patterns_t&) const;
 };
 
 // NOTE: numerals have 32 bit unsigned max ranges
@@ -151,5 +150,5 @@ public:
     abnf_vals(abnf_parser&);
 
     bool generate(str_const_iterator& it, const str_const_iterator& end);
-    bool run(str_const_iterator& it, const str_const_iterator& end);
+    bool run(str_const_iterator& it, const str_const_iterator& end, matched_patterns_t&) const;
 };
